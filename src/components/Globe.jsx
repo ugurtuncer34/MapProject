@@ -65,6 +65,7 @@ export default function Globe({
   locations,
   connections,
   arcColors,
+  timelineTimestamp,
   onGlobeClick,
   onObjectClick,
   onArcClick,
@@ -91,18 +92,24 @@ export default function Globe({
     for (const loc of locations) {
       const lat = Number(loc.latitude);
       const lng = Number(loc.longitude);
-
       if (isNaN(lat) || isNaN(lng)) continue;
+
+      const visitTime = new Date(loc.visit_date).getTime();
+      if (timelineTimestamp < visitTime) continue;
+
+      const elapsedDays = Math.floor((timelineTimestamp - visitTime) / (1000 * 60 * 60 * 24));
+      const activeDays = Math.min(elapsedDays, Number(loc.duration_days || 0));
+      if (activeDays <= 0) continue;
 
       const key = `${lat.toFixed(6)}|${lng.toFixed(6)}`;
       if (!map[key]) {
         map[key] = { lat, lng, totalDays: 0, points: [] };
       }
-      map[key].totalDays += Number(loc.duration_days || 0);
-      map[key].points.push(loc);
+      map[key].totalDays += activeDays;
+      map[key].points.push({ ...loc, duration_days: activeDays });
     }
     return Object.values(map);
-  }, [locations]);
+  }, [locations, timelineTimestamp]);
 
   const customThreeObject = useCallback((slice) => {
     const { totalDays, points } = slice;
@@ -185,21 +192,23 @@ export default function Globe({
           if (Array.isArray(c.visit_dates)) dates = c.visit_dates;
           else try { dates = JSON.parse(c.visit_dates); } catch (_) {}
         }
+
+        const activeDates = dates.filter(d => new Date(d).getTime() <= timelineTimestamp);
+        if (activeDates.length === 0) return;
+
         const base = {
           startLat: Number(c.start_lat),
           startLng: Number(c.start_lng),
           endLat: Number(c.end_lat),
           endLng: Number(c.end_lng),
           id: c.id,
-          dates,
+          dates: activeDates,
         };
-        // Core arc (thin, clickable)
         result.push({ ...base, isGlow: false });
-        // Glow arc (thick, transparent, no click)
         result.push({ ...base, isGlow: true });
       });
     return result;
-  }, [connections]);
+  }, [connections, timelineTimestamp]);
 
   const arcColor = useCallback(
     (arc) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import LoadingScreen from './components/LoadingScreen';
 import Globe from './components/Globe';
 import AddLocationModal from './components/AddLocationModal';
@@ -48,6 +48,24 @@ export default function App() {
     useLocations();
   const { connections, fetchConnections, addConnection, deleteConnection } =
     useConnections();
+
+  // ---- Timeline state ----
+  const maxTime = useMemo(() => Date.now(), []);
+  const [timelineVal, setTimelineVal] = useState(maxTime);
+
+  const minTime = useMemo(() => {
+    if (!locations || locations.length === 0) return new Date('1993-01-01').getTime();
+
+    const validDates = locations
+      .map(l => new Date(l.visit_date).getTime())
+      .filter(t => !isNaN(t));
+
+    if (validDates.length === 0) return new Date('1993-01-01').getTime();
+
+    return Math.min(...validDates);
+  }, [locations]);
+
+  useEffect(() => { setTimelineVal(maxTime); }, [maxTime]);
 
   // ---- Async asset loading ----
   useEffect(() => {
@@ -279,6 +297,7 @@ export default function App() {
     <>
       <Globe
         textureUrl={textureUrl}
+        timelineTimestamp={timelineVal}
         locations={locations}
         connections={connections}
         arcColors={arcColors}
@@ -294,6 +313,24 @@ export default function App() {
         rayMode={rayMode}
         onCancelRay={handleCancelRay}
       />
+
+      {/* Timeline Slider */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 backdrop-blur-md bg-black/40 border border-cyan-500/20 rounded-xl px-5 py-3 flex items-center gap-4 shadow-[0_0_30px_rgba(0,255,255,0.06)]">
+        <span className="text-cyan-300/80 text-xs font-mono whitespace-nowrap min-w-[120px]">
+          {new Date(timelineVal).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })}
+        </span>
+        <input
+          type="range"
+          min={minTime}
+          max={maxTime}
+          value={timelineVal}
+          onChange={(e) => setTimelineVal(Number(e.target.value))}
+          className="w-48 h-1 bg-cyan-900/30 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(0,255,255,0.4)]"
+        />
+        <span className="text-cyan-500/40 text-xs font-mono whitespace-nowrap">
+          {new Date(maxTime).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })}
+        </span>
+      </div>
 
       {modalOpen && (
         <AddLocationModal
