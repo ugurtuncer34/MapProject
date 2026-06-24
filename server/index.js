@@ -58,7 +58,7 @@ app.get('/api/connections', async (_req, res) => {
   const db = await getDb();
   const results = db.exec(`
     SELECT
-      c.id,
+      c.id, c.dates, c.visit_dates,
       c.source_location_id, sl.city AS src_city, sl.country AS src_country,
       sl.latitude AS start_lat, sl.longitude AS start_lng,
       c.destination_location_id, dl.city AS dst_city, dl.country AS dst_country,
@@ -69,25 +69,55 @@ app.get('/api/connections', async (_req, res) => {
   `);
   if (!results[0]) return res.json([]);
   res.json(
-    results[0].values.map((r) => ({
-      id: r[0],
-      source_location_id: r[1], source_city: r[2], source_country: r[3],
-      start_lat: r[4], start_lng: r[5],
-      destination_location_id: r[6], dest_city: r[7], dest_country: r[8],
-      end_lat: r[9], end_lng: r[10],
-    }))
+    results[0].values.map((r) => {
+      let dates = [], visitDates = [];
+      try { dates = JSON.parse(r[1] || '[]'); } catch (_) {}
+      try { visitDates = JSON.parse(r[2] || '[]'); } catch (_) {}
+      return {
+        id: r[0], dates, visit_dates: visitDates,
+        source_location_id: r[3], source_city: r[4], source_country: r[5],
+        start_lat: r[6], start_lng: r[7],
+        destination_location_id: r[8], dest_city: r[9], dest_country: r[10],
+        end_lat: r[11], end_lng: r[12],
+      };
+    })
   );
 });
 
 app.post('/api/connections', async (req, res) => {
   const db = await getDb();
-  const { source_location_id, destination_location_id } = req.body;
+  const { source_location_id, destination_location_id, dates, date } = req.body;
   if (!source_location_id || !destination_location_id) {
     return res.status(400).json({ error: 'source_location_id ve destination_location_id zorunludur' });
   }
-  db.run(
-    'INSERT INTO Connections (source_location_id, destination_location_id) VALUES (?, ?)',
+
+  // Check if a connection already exists for this pair
+  const existing = db.exec(
+    'SELECT id, visit_dates FROM Connections WHERE source_location_id = ? AND destination_location_id = ?',
     [source_location_id, destination_location_id]
+  );
+
+  if (existing[0] && existing[0].values.length > 0) {
+    // Merge new date into existing visit_dates array
+    const row = existing[0].values[0];
+    const connId = row[0];
+    let currentDates = [];
+    try { currentDates = JSON.parse(row[1] || '[]'); } catch (_) {}
+    if (date) currentDates.push(date);
+
+    db.run('UPDATE Connections SET visit_dates = ? WHERE id = ?', [
+      JSON.stringify(currentDates), connId,
+    ]);
+    saveDb();
+    return res.json({ success: true, id: connId, merged: true });
+  }
+
+  // No existing connection, create new
+  const datesJson = JSON.stringify(dates || []);
+  const visitDatesJson = JSON.stringify(date ? [date] : []);
+  db.run(
+    'INSERT INTO Connections (source_location_id, destination_location_id, dates, visit_dates) VALUES (?, ?, ?, ?)',
+    [source_location_id, destination_location_id, datesJson, visitDatesJson]
   );
   saveDb();
   const maxRow = db.exec('SELECT MAX(id) AS id FROM Connections')[0];
@@ -99,6 +129,43 @@ app.delete('/api/connections/:id', async (req, res) => {
   db.run('DELETE FROM Connections WHERE id = ?', [req.params.id]);
   saveDb();
   res.json({ success: true });
+});
+
+// ---- Add date to connection ----
+app.post('/api/connections/:id/dates', async (req, res) => {
+  const db = await getDb();
+  const { date } = req.body;
+  if (!date) return res.status(400).json({ error: 'date zorunludur' });
+
+  const existing = db.exec('SELECT visit_dates FROM Connections WHERE id = ?', [req.params.id]);
+  if (!existing[0] || existing[0].values.length === 0) {
+    return res.status(404).json({ error: 'Bağlantı bulunamadı' });
+  }
+
+  let dates = [];
+  try { dates = JSON.parse(existing[0].values[0][0] || '[]'); } catch (_) {}
+  dates.push(date);
+
+  db.run('UPDATE Connections SET visit_dates = ? WHERE id = ?', [
+    JSON.stringify(dates), req.params.id,
+  ]);
+  saveDb();
+  res.json({ success: true, dates });
+});
+
+// ---- Replace all dates for connection ----
+app.put('/api/connections/:id/dates', async (req, res) => {
+  const db = await getDb();
+  const { dates } = req.body;
+  try {
+    db.run('UPDATE Connections SET visit_dates = ? WHERE id = ?', [
+      JSON.stringify(dates), req.params.id,
+    ]);
+    saveDb();
+    res.json({ success: true, dates });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ---- Start ----

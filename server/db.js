@@ -39,10 +39,16 @@ export async function getDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source_location_id INTEGER NOT NULL,
       destination_location_id INTEGER NOT NULL,
+      dates TEXT NOT NULL DEFAULT '[]',
+      visit_dates TEXT NOT NULL DEFAULT '[]',
       FOREIGN KEY (source_location_id) REFERENCES Locations(id) ON DELETE CASCADE,
       FOREIGN KEY (destination_location_id) REFERENCES Locations(id) ON DELETE CASCADE
     )
   `);
+
+  // Migration: add columns if missing
+  try { db.run(`ALTER TABLE Connections ADD COLUMN dates TEXT NOT NULL DEFAULT '[]'`); } catch (_) {}
+  try { db.run(`ALTER TABLE Connections ADD COLUMN visit_dates TEXT NOT NULL DEFAULT '[]'`); } catch (_) {}
 
   return db;
 }

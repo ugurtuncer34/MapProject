@@ -41,6 +41,7 @@ export default function App() {
   // ---- Arc color state ----
   const [arcColors, setArcColors] = useState({});
   const [arcPickerArc, setArcPickerArc] = useState(null);
+  const [newArcDate, setNewArcDate] = useState('');
 
   // ---- Data hooks ----
   const { locations, fetchLocations, addLocation, deleteLocation } =
@@ -72,7 +73,7 @@ export default function App() {
           texReceived += value.length;
           if (texContentLength && !cancelled.current)
             setProgress(
-              5 + Math.round((texReceived / texContentLength) * 30)
+              Math.min(5 + Math.round((texReceived / texContentLength) * 30), 34)
             );
         }
         if (cancelled.current) return;
@@ -99,7 +100,7 @@ export default function App() {
           geoReceived += value.length;
           if (geoContentLength && !cancelled.current)
             setProgress(
-              38 + Math.round((geoReceived / geoContentLength) * 52)
+              Math.min(38 + Math.round((geoReceived / geoContentLength) * 52), 95)
             );
         }
         if (cancelled.current) return;
@@ -142,6 +143,17 @@ export default function App() {
       fetchConnections();
     }
   }, [phase, fetchLocations, fetchConnections]);
+
+  // ---- InfoCard sync when locations update ----
+  useEffect(() => {
+    if (!infoCardOpen || infoCardPoints.length === 0) return;
+    const city = infoCardPoints[0].city;
+    const updated = locations.filter((loc) => loc.city === city);
+
+    if (updated.length !== infoCardPoints.length) {
+      setInfoCardPoints(updated);
+    }
+  }, [locations]);
 
   // ---- Auto-rotate: stop when UI is open ----
   const effectiveAutoRotate = autoRotate && !infoCardOpen && !rayMode && !arcPickerArc;
@@ -271,7 +283,7 @@ export default function App() {
         connections={connections}
         arcColors={arcColors}
         onGlobeClick={handleGlobeClick}
-        onHexBinClick={handleHexBinClick}
+        onObjectClick={handleHexBinClick}
         onArcClick={handleArcClick}
         autoRotate={effectiveAutoRotate}
       />
@@ -306,28 +318,103 @@ export default function App() {
         />
       )}
 
-      {/* Arc Color Picker */}
+      {/* Arc Detail Card */}
       {arcPickerArc && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={() => setArcPickerArc(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => { setArcPickerArc(null); setNewArcDate(''); }}
         >
           <div
-            className="bg-[#0a0f1a] border border-cyan-500/25 rounded-2xl shadow-[0_0_60px_rgba(0,255,255,0.08)] p-5"
+            className="bg-[#0a0f1a] border border-cyan-500/25 rounded-2xl shadow-[0_0_60px_rgba(0,255,255,0.08)] p-6 w-80 max-h-[80vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-cyan-300 text-sm font-mono tracking-[0.15em] uppercase mb-3">
-              Işın Rengi
-            </h3>
-            <div className="flex flex-wrap gap-2 w-48 justify-center">
-              {ARC_PALETTE.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => handleArcColorSelect(color)}
-                  className="w-8 h-8 rounded-full border-2 border-transparent hover:border-white/60 hover:scale-110 transition-all cursor-pointer"
-                  style={{ backgroundColor: color }}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-cyan-300 text-sm font-mono tracking-[0.15em] uppercase">Rota Detayları</h3>
+              <button onClick={() => setArcPickerArc(null)} className="text-cyan-500/50 hover:text-cyan-300 transition-colors cursor-pointer">✕</button>
+            </div>
+
+            <div className="mb-6">
+              <h4 className="text-cyan-500/50 text-[10px] font-mono uppercase tracking-wider mb-2">Ziyaret Tarihleri</h4>
+              <div className="space-y-1.5 mb-3 max-h-32 overflow-y-auto pr-2">
+                {(arcPickerArc.dates && arcPickerArc.dates.length > 0) ? arcPickerArc.dates.map((date, i) => (
+                  <div key={i} className="flex items-center justify-between text-cyan-100 text-xs font-mono bg-black/40 px-3 py-2 rounded-lg border border-cyan-500/10 group">
+                    <span>{date}</span>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={async () => {
+                          const newDate = prompt("Tarihi düzenle (YYYY-MM-DD):", date);
+                          if (newDate && newDate !== date) {
+                            const newDates = [...arcPickerArc.dates];
+                            newDates[i] = newDate;
+                            const res = await fetch(`/api/connections/${arcPickerArc.id}/dates`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ dates: newDates })
+                            });
+                            if(res.ok) { setArcPickerArc(p => ({...p, dates: newDates})); fetchConnections(); }
+                          }
+                        }}
+                        className="text-cyan-500/50 hover:text-cyan-300 cursor-pointer"
+                      >✎</button>
+                      <button
+                        onClick={async () => {
+                          if(!window.confirm("Silmek istediğinize emin misiniz?")) return;
+                          const newDates = arcPickerArc.dates.filter((_, index) => index !== i);
+                          const res = await fetch(`/api/connections/${arcPickerArc.id}/dates`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ dates: newDates })
+                          });
+                          if(res.ok) { setArcPickerArc(p => ({...p, dates: newDates})); fetchConnections(); }
+                        }}
+                        className="text-red-500/50 hover:text-red-400 cursor-pointer"
+                      >✕</button>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="text-cyan-500/30 text-xs font-mono italic">Henüz tarih eklenmemiş.</div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={newArcDate}
+                  onChange={(e) => setNewArcDate(e.target.value)}
+                  className="flex-1 bg-black/40 border border-cyan-500/20 rounded-lg px-2 py-2 text-cyan-100 text-xs focus:outline-none focus:border-cyan-400/50 [color-scheme:dark]"
                 />
-              ))}
+                <button
+                  onClick={async () => {
+                    if(!newArcDate) return;
+                    const res = await fetch(`/api/connections/${arcPickerArc.id}/dates`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ date: newArcDate }),
+                    });
+                    if (res.ok) {
+                      setArcPickerArc(prev => ({...prev, dates: [...(prev.dates || []), newArcDate]}));
+                      setNewArcDate('');
+                      fetchConnections();
+                    }
+                  }}
+                  className="bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 px-3 py-2 rounded-lg text-xs font-mono hover:bg-cyan-500/20 hover:shadow-[0_0_15px_rgba(0,255,255,0.2)] transition-all cursor-pointer"
+                >
+                  Ekle
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-cyan-500/50 text-[10px] font-mono uppercase tracking-wider mb-2">Işın Rengi</h4>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {ARC_PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => handleArcColorSelect(color)}
+                    className="w-8 h-8 rounded-full border-2 border-transparent hover:border-white/60 hover:scale-110 transition-all cursor-pointer"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
