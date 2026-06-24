@@ -37,6 +37,7 @@ export default function App() {
   // ---- Ray drawing state ----
   const [rayMode, setRayMode] = useState(false);
   const [raySource, setRaySource] = useState(null);
+  const [focusedCoords, setFocusedCoords] = useState(null);
 
   // ---- Arc color state ----
   const [arcColors, setArcColors] = useState({});
@@ -66,6 +67,22 @@ export default function App() {
   }, [locations]);
 
   useEffect(() => { setTimelineVal(maxTime); }, [maxTime]);
+
+  const activeStats = useMemo(() => {
+    const active = locations.filter(l => new Date(l.visit_date).getTime() <= timelineVal);
+    const cities = {};
+    const countries = new Set();
+    active.forEach(l => {
+      countries.add(l.country);
+      if (!cities[l.city]) cities[l.city] = { totalDays: 0, lat: l.latitude, lng: l.longitude };
+      const elapsed = Math.floor((timelineVal - new Date(l.visit_date).getTime()) / (1000 * 60 * 60 * 24));
+      cities[l.city].totalDays += Math.min(elapsed, Number(l.duration_days || 0));
+    });
+    return {
+      countryCount: countries.size,
+      cities: Object.entries(cities).filter(([_, data]) => data.totalDays > 0).sort((a,b) => b[1].totalDays - a[1].totalDays),
+    };
+  }, [locations, timelineVal]);
 
   // ---- Async asset loading ----
   useEffect(() => {
@@ -217,7 +234,7 @@ export default function App() {
   const handleArcColorSelect = useCallback(
     (color) => {
       if (!arcPickerArc) return;
-      setArcColors((prev) => ({ ...prev, [arcPickerArc.id]: color }));
+      setArcColors((prev) => ({ ...prev, [arcPickerArc.originalId || arcPickerArc.originalId || arcPickerArc.id]: color }));
       setArcPickerArc(null);
     },
     [arcPickerArc]
@@ -304,6 +321,7 @@ export default function App() {
         onGlobeClick={handleGlobeClick}
         onObjectClick={handleHexBinClick}
         onArcClick={handleArcClick}
+        focusedCoords={focusedCoords}
         autoRotate={effectiveAutoRotate}
       />
 
@@ -314,9 +332,29 @@ export default function App() {
         onCancelRay={handleCancelRay}
       />
 
+      {/* Stats Panel */}
+      <div className="fixed top-6 right-6 z-40 bg-black/40 backdrop-blur-md border border-cyan-500/20 rounded-xl p-4 w-64 max-h-[60vh] overflow-y-auto shadow-[0_0_30px_rgba(0,255,255,0.06)]">
+        <div className="text-cyan-500/50 text-[10px] font-mono uppercase tracking-wider mb-3 flex justify-between">
+          <span>Ziyaret Edilen Ülkeler</span>
+          <span className="text-cyan-300 font-bold">{activeStats.countryCount}</span>
+        </div>
+        <div className="space-y-2">
+          {activeStats.cities.map(([cityName, data]) => (
+            <div
+              key={cityName}
+              onClick={() => setFocusedCoords({ lat: data.lat, lng: data.lng })}
+              className="flex justify-between items-center group cursor-pointer hover:bg-cyan-500/10 p-1.5 rounded transition-colors"
+            >
+              <span className="text-cyan-100 text-xs font-mono group-hover:text-cyan-300">{cityName}</span>
+              <span className="text-cyan-500/60 text-[10px] font-mono">{data.totalDays} gün</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Timeline Slider */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 backdrop-blur-md bg-black/40 border border-cyan-500/20 rounded-xl px-5 py-3 flex items-center gap-4 shadow-[0_0_30px_rgba(0,255,255,0.06)]">
-        <span className="text-cyan-300/80 text-xs font-mono whitespace-nowrap min-w-[120px]">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 backdrop-blur-md bg-black/40 border border-cyan-500/20 rounded-xl px-5 py-3 flex items-center gap-4 shadow-[0_0_30px_rgba(0,255,255,0.06)] w-[80vw] max-w-4xl">
+        <span className="text-cyan-300/80 text-xs font-mono whitespace-nowrap min-w-[120px] text-right">
           {new Date(timelineVal).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })}
         </span>
         <input
@@ -325,9 +363,9 @@ export default function App() {
           max={maxTime}
           value={timelineVal}
           onChange={(e) => setTimelineVal(Number(e.target.value))}
-          className="w-48 h-1 bg-cyan-900/30 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(0,255,255,0.4)]"
+          className="w-full h-1 bg-cyan-900/30 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(0,255,255,0.4)]"
         />
-        <span className="text-cyan-500/40 text-xs font-mono whitespace-nowrap">
+        <span className="text-cyan-500/40 text-xs font-mono whitespace-nowrap min-w-[120px]">
           {new Date(maxTime).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })}
         </span>
       </div>
@@ -383,7 +421,7 @@ export default function App() {
                           if (newDate && newDate !== date) {
                             const newDates = [...arcPickerArc.dates];
                             newDates[i] = newDate;
-                            const res = await fetch(`/api/connections/${arcPickerArc.id}/dates`, {
+                            const res = await fetch(`/api/connections/${arcPickerArc.originalId || arcPickerArc.id}/dates`, {
                               method: 'PUT',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ dates: newDates })
@@ -397,7 +435,7 @@ export default function App() {
                         onClick={async () => {
                           if(!window.confirm("Silmek istediğinize emin misiniz?")) return;
                           const newDates = arcPickerArc.dates.filter((_, index) => index !== i);
-                          const res = await fetch(`/api/connections/${arcPickerArc.id}/dates`, {
+                          const res = await fetch(`/api/connections/${arcPickerArc.originalId || arcPickerArc.id}/dates`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ dates: newDates })
@@ -422,7 +460,7 @@ export default function App() {
                 <button
                   onClick={async () => {
                     if(!newArcDate) return;
-                    const res = await fetch(`/api/connections/${arcPickerArc.id}/dates`, {
+                    const res = await fetch(`/api/connections/${arcPickerArc.originalId || arcPickerArc.id}/dates`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ date: newArcDate }),

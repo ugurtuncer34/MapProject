@@ -66,6 +66,7 @@ export default function Globe({
   connections,
   arcColors,
   timelineTimestamp,
+  focusedCoords,
   onGlobeClick,
   onObjectClick,
   onArcClick,
@@ -196,23 +197,27 @@ export default function Globe({
         const activeDates = dates.filter(d => new Date(d).getTime() <= timelineTimestamp);
         if (activeDates.length === 0) return;
 
-        const base = {
-          startLat: Number(c.start_lat),
-          startLng: Number(c.start_lng),
-          endLat: Number(c.end_lat),
-          endLng: Number(c.end_lng),
-          id: c.id,
-          dates: activeDates,
-        };
-        result.push({ ...base, isGlow: false });
-        result.push({ ...base, isGlow: true });
+        activeDates.forEach((date, i) => {
+          const base = {
+            startLat: Number(c.start_lat),
+            startLng: Number(c.start_lng),
+            endLat: Number(c.end_lat),
+            endLng: Number(c.end_lng),
+            id: c.id + '_' + i,
+            bundleOffset: i * 0.015,
+            originalId: c.id,
+            dates: activeDates,
+          };
+          result.push({ ...base, isGlow: false });
+          result.push({ ...base, isGlow: true });
+        });
       });
     return result;
   }, [connections, timelineTimestamp]);
 
   const arcColor = useCallback(
     (arc) => {
-      const cid = arc.id;
+      const cid = arc.originalId || arc.id;
       if (arc.isGlow) {
         const baseColor = (arcColors && arcColors[cid])
           ? arcColors[cid]
@@ -243,8 +248,15 @@ export default function Globe({
     const a = Math.sin(dLat / 2) ** 2 +
       Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
     const dist = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return Math.min(0.06 + dist * 0.25, 0.32);
+    const baseAlt = Math.min(0.06 + dist * 0.25, 0.32);
+    return baseAlt + (arc.bundleOffset || 0);
   }, []);
+
+  useEffect(() => {
+    if (focusedCoords && globeRef.current) {
+      globeRef.current.pointOfView({ lat: focusedCoords.lat, lng: focusedCoords.lng, altitude: 0.4 }, 1500);
+    }
+  }, [focusedCoords]);
 
   useEffect(() => {
     const globe = globeRef.current;
