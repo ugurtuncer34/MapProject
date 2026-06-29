@@ -212,7 +212,7 @@ export default function App() {
       if (rayMode) {
         const targetPoint = hex.points[0];
         if (raySource && targetPoint.id !== raySource.id) {
-          addConnection(raySource.id, targetPoint.id);
+          addConnection(raySource.id, targetPoint.id, targetPoint.visit_date);
         }
         setRayMode(false);
         setRaySource(null);

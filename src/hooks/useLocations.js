@@ -54,11 +54,11 @@ export function useConnections() {
   }, []);
 
   const addConnection = useCallback(
-    async (source_location_id, destination_location_id) => {
+    async (source_location_id, destination_location_id, date) => {
       const res = await fetch('/api/connections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source_location_id, destination_location_id }),
+        body: JSON.stringify({ source_location_id, destination_location_id, date }),
       });
       const data = await res.json();
       await fetchConnections();

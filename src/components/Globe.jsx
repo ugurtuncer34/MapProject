@@ -247,8 +247,9 @@ export default function Globe({
     const lat2 = arc.endLat * Math.PI / 180;
     const a = Math.sin(dLat / 2) ** 2 +
       Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-    const dist = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const baseAlt = Math.min(0.06 + dist * 0.25, 0.32);
+    const safeA = Math.min(Math.max(a, 0), 1);
+    const dist = 2 * Math.atan2(Math.sqrt(safeA), Math.sqrt(1 - safeA));
+    const baseAlt = Math.max(0.08, dist * 0.25);
     return baseAlt + (arc.bundleOffset || 0);
   }, []);
 
