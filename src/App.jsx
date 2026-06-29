@@ -4,6 +4,7 @@ import Globe from './components/Globe';
 import AddLocationModal from './components/AddLocationModal';
 import InfoCard from './components/InfoCard';
 import ControlPanel from './components/ControlPanel';
+import MercatorMap from './components/MercatorMap';
 import useLocations, { useConnections } from './hooks/useLocations';
 
 const TEXTURE_URL =
@@ -33,6 +34,9 @@ export default function App() {
   // ---- InfoCard state ----
   const [infoCardOpen, setInfoCardOpen] = useState(false);
   const [infoCardPoints, setInfoCardPoints] = useState([]);
+
+  // ---- View mode state ----
+  const [viewMode, setViewMode] = useState('globe');
 
   // ---- Ray drawing state ----
   const [rayMode, setRayMode] = useState(false);
@@ -312,20 +316,36 @@ export default function App() {
 
   return (
     <>
-      <Globe
-        textureUrl={textureUrl}
-        timelineTimestamp={timelineVal}
-        locations={locations}
-        connections={connections}
-        arcColors={arcColors}
-        onGlobeClick={handleGlobeClick}
-        onObjectClick={handleHexBinClick}
-        onArcClick={handleArcClick}
-        focusedCoords={focusedCoords}
-        autoRotate={effectiveAutoRotate}
-      />
+      {viewMode === 'globe' ? (
+        <Globe
+          textureUrl={textureUrl}
+          timelineTimestamp={timelineVal}
+          locations={locations}
+          connections={connections}
+          arcColors={arcColors}
+          onGlobeClick={handleGlobeClick}
+          onObjectClick={handleHexBinClick}
+          onArcClick={handleArcClick}
+          focusedCoords={focusedCoords}
+          autoRotate={effectiveAutoRotate}
+        />
+      ) : (
+        <MercatorMap
+          timelineTimestamp={timelineVal}
+          locations={locations}
+          connections={connections}
+          arcColors={arcColors}
+          onGlobeClick={handleGlobeClick}
+          onObjectClick={handleHexBinClick}
+          onArcClick={handleArcClick}
+          focusedCoords={focusedCoords}
+          autoRotate={effectiveAutoRotate}
+        />
+      )}
 
       <ControlPanel
+        viewMode={viewMode}
+        onViewModeToggle={() => setViewMode((p) => (p === 'globe' ? 'mercator' : 'globe'))}
         autoRotate={autoRotate}
         onToggle={() => setAutoRotate((p) => !p)}
         rayMode={rayMode}
