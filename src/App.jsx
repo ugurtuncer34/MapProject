@@ -74,17 +74,23 @@ export default function App() {
 
   const activeStats = useMemo(() => {
     const active = locations.filter(l => new Date(l.visit_date).getTime() <= timelineVal);
-    const cities = {};
-    const countries = new Set();
+    const countriesMap = {};
+
     active.forEach(l => {
-      countries.add(l.country);
-      if (!cities[l.city]) cities[l.city] = { totalDays: 0, lat: l.latitude, lng: l.longitude };
+      if (!countriesMap[l.country]) {
+        countriesMap[l.country] = { totalDays: 0, lat: l.latitude, lng: l.longitude };
+      }
       const elapsed = Math.floor((timelineVal - new Date(l.visit_date).getTime()) / (1000 * 60 * 60 * 24));
-      cities[l.city].totalDays += Math.min(elapsed, Number(l.duration_days || 0));
+      countriesMap[l.country].totalDays += Math.min(elapsed, Number(l.duration_days || 0));
     });
+
+    const countriesArray = Object.entries(countriesMap)
+      .filter(([_, data]) => data.totalDays > 0)
+      .sort((a, b) => b[1].totalDays - a[1].totalDays);
+
     return {
-      countryCount: countries.size,
-      cities: Object.entries(cities).filter(([_, data]) => data.totalDays > 0).sort((a,b) => b[1].totalDays - a[1].totalDays),
+      countryCount: countriesArray.length,
+      countries: countriesArray,
     };
   }, [locations, timelineVal]);
 
@@ -359,13 +365,13 @@ export default function App() {
           <span className="text-cyan-300 font-bold">{activeStats.countryCount}</span>
         </div>
         <div className="space-y-2">
-          {activeStats.cities.map(([cityName, data]) => (
+          {activeStats.countries.map(([countryName, data]) => (
             <div
-              key={cityName}
+              key={countryName}
               onClick={() => setFocusedCoords({ lat: data.lat, lng: data.lng })}
               className="flex justify-between items-center group cursor-pointer hover:bg-cyan-500/10 p-1.5 rounded transition-colors"
             >
-              <span className="text-cyan-100 text-xs font-mono group-hover:text-cyan-300">{cityName}</span>
+              <span className="text-cyan-100 text-xs font-mono group-hover:text-cyan-300">{countryName}</span>
               <span className="text-cyan-500/60 text-[10px] font-mono">{data.totalDays} gün</span>
             </div>
           ))}

@@ -18,6 +18,17 @@ function getPointColor(totalDays, isGlow) {
   return [255, 145, 0, alpha];
 }
 
+function formatDuration(totalDays) {
+  if (totalDays < 30) return `${totalDays} gün`;
+  if (totalDays < 365) return `${Math.round(totalDays / 30)} ay`;
+  return `${(totalDays / 365).toFixed(1)} yıl`;
+}
+
+function getPointRadius(days, isGlow) {
+  const base = 3 + Math.log10(days + 1) * 1.5;
+  return isGlow ? base * 2 : base;
+}
+
 const INITIAL_VIEW_STATE = {
   longitude: 35,
   latitude: 39,
@@ -171,20 +182,26 @@ export default function MercatorMap({
         id: 'locations-glow',
         data: customData,
         getPosition: (d) => [d.lng, d.lat],
-        getRadius: 18,
+        getRadius: (d) => getPointRadius(d.totalDays, true),
         radiusUnits: 'pixels',
         getFillColor: (d) => getPointColor(d.totalDays, true),
-        updateTriggers: { getFillColor: timelineTimestamp },
+        updateTriggers: {
+          getFillColor: timelineTimestamp,
+          getRadius: timelineTimestamp,
+        },
       }),
       new ScatterplotLayer({
         id: 'locations-core',
         data: customData,
         pickable: true,
         getPosition: (d) => [d.lng, d.lat],
-        getRadius: 5,
+        getRadius: (d) => getPointRadius(d.totalDays, false),
         radiusUnits: 'pixels',
         getFillColor: (d) => getPointColor(d.totalDays, false),
-        updateTriggers: { getFillColor: timelineTimestamp },
+        updateTriggers: {
+          getFillColor: timelineTimestamp,
+          getRadius: timelineTimestamp,
+        },
       }),
       new ArcLayer({
         id: 'arcs-glow',
@@ -244,6 +261,25 @@ export default function MercatorMap({
       controller={true}
       layers={layers}
       onClick={handleClick}
+      getTooltip={({ object, layer }) => {
+        if (!object) return null;
+        if (layer?.id === 'locations-core') {
+          return {
+            text: formatDuration(object.totalDays),
+            style: {
+              backgroundColor: 'rgba(10, 15, 26, 0.9)',
+              color: '#a5f3fc',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              border: '1px solid rgba(0, 255, 255, 0.2)',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              boxShadow: '0 0 15px rgba(0, 255, 255, 0.1)',
+            },
+          };
+        }
+        return null;
+      }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%' }}
     >
       <Map reuseMaps mapLib={maplibregl} mapStyle={MAP_STYLE} />
