@@ -1,4 +1,4 @@
-export default function ControlPanel({ viewMode, onViewModeToggle, autoRotate, onToggle, rayMode, onCancelRay }) {
+export default function ControlPanel({ viewMode, onViewModeToggle, autoRotate, onToggle, rayMode, onCancelRay, showArcs, onToggleArcs, dynamicSize, onToggleDynamicSize }) {
   return (
     <div className="fixed bottom-6 left-6 z-40 flex flex-col gap-2">
       <button
@@ -25,12 +25,30 @@ export default function ControlPanel({ viewMode, onViewModeToggle, autoRotate, o
         </div>
       )}
 
+      {viewMode === 'globe' && (
+        <button
+          onClick={onToggle}
+          className="backdrop-blur-md bg-black/40 border border-cyan-500/20 rounded-xl px-4 py-3 text-cyan-300/80 text-xs font-mono tracking-[0.12em] uppercase hover:bg-cyan-500/10 hover:border-cyan-400/30 hover:shadow-[0_0_20px_rgba(0,255,255,0.12)] transition-all cursor-pointer"
+        >
+          {autoRotate ? '◉ Dönüş Açık' : '○ Dönüş Kapalı'}
+        </button>
+      )}
+
       <button
-        onClick={onToggle}
-        className="backdrop-blur-md bg-black/40 border border-cyan-500/20 rounded-xl px-4 py-3 text-cyan-300/80 text-xs font-mono tracking-[0.12em] uppercase hover:bg-cyan-500/10 hover:border-cyan-400/30 hover:shadow-[0_0_20px_rgba(0,255,255,0.12)] transition-all cursor-pointer"
+        onClick={onToggleArcs}
+        className="backdrop-blur-md bg-black/40 border border-purple-500/20 rounded-xl px-4 py-3 text-purple-300/80 text-xs font-mono tracking-[0.12em] uppercase hover:bg-purple-500/10 transition-all cursor-pointer"
       >
-        {autoRotate ? '◉ Dönüş Açık' : '○ Dönüş Kapalı'}
+        {showArcs ? '⚡ Işınlar: Açık' : '⚡ Işınlar: Kapalı'}
       </button>
+
+      {viewMode === 'mercator' && (
+        <button
+          onClick={onToggleDynamicSize}
+          className="backdrop-blur-md bg-black/40 border border-cyan-500/20 rounded-xl px-4 py-3 text-cyan-300/80 text-xs font-mono tracking-[0.12em] uppercase hover:bg-cyan-500/10 transition-all cursor-pointer"
+        >
+          {dynamicSize ? '⭕ Boyut: Dinamik' : '⭕ Boyut: Sabit (1 Ay)'}
+        </button>
+      )}
     </div>
   );
 }

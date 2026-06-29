@@ -37,6 +37,8 @@ export default function App() {
 
   // ---- View mode state ----
   const [viewMode, setViewMode] = useState('globe');
+  const [showArcs, setShowArcs] = useState(true);
+  const [dynamicSize, setDynamicSize] = useState(true);
 
   // ---- Ray drawing state ----
   const [rayMode, setRayMode] = useState(false);
@@ -327,7 +329,7 @@ export default function App() {
           textureUrl={textureUrl}
           timelineTimestamp={timelineVal}
           locations={locations}
-          connections={connections}
+          connections={showArcs ? connections : []}
           arcColors={arcColors}
           onGlobeClick={handleGlobeClick}
           onObjectClick={handleHexBinClick}
@@ -339,8 +341,9 @@ export default function App() {
         <MercatorMap
           timelineTimestamp={timelineVal}
           locations={locations}
-          connections={connections}
+          connections={showArcs ? connections : []}
           arcColors={arcColors}
+          dynamicSize={dynamicSize}
           onGlobeClick={handleGlobeClick}
           onObjectClick={handleHexBinClick}
           onArcClick={handleArcClick}
@@ -356,6 +359,10 @@ export default function App() {
         onToggle={() => setAutoRotate((p) => !p)}
         rayMode={rayMode}
         onCancelRay={handleCancelRay}
+        showArcs={showArcs}
+        onToggleArcs={() => setShowArcs((p) => !p)}
+        dynamicSize={dynamicSize}
+        onToggleDynamicSize={() => setDynamicSize((p) => !p)}
       />
 
       {/* Stats Panel */}

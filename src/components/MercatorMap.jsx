@@ -58,6 +58,7 @@ export default function MercatorMap({
   connections,
   arcColors,
   timelineTimestamp,
+  dynamicSize,
   focusedCoords,
   onGlobeClick,
   onObjectClick,
@@ -182,12 +183,12 @@ export default function MercatorMap({
         id: 'locations-glow',
         data: customData,
         getPosition: (d) => [d.lng, d.lat],
-        getRadius: (d) => getPointRadius(d.totalDays, true),
+        getRadius: (d) => getPointRadius(dynamicSize ? d.totalDays : 30, true),
         radiusUnits: 'pixels',
         getFillColor: (d) => getPointColor(d.totalDays, true),
         updateTriggers: {
           getFillColor: timelineTimestamp,
-          getRadius: timelineTimestamp,
+          getRadius: [timelineTimestamp, dynamicSize],
         },
       }),
       new ScatterplotLayer({
@@ -195,12 +196,12 @@ export default function MercatorMap({
         data: customData,
         pickable: true,
         getPosition: (d) => [d.lng, d.lat],
-        getRadius: (d) => getPointRadius(d.totalDays, false),
+        getRadius: (d) => getPointRadius(dynamicSize ? d.totalDays : 30, false),
         radiusUnits: 'pixels',
         getFillColor: (d) => getPointColor(d.totalDays, false),
         updateTriggers: {
           getFillColor: timelineTimestamp,
-          getRadius: timelineTimestamp,
+          getRadius: [timelineTimestamp, dynamicSize],
         },
       }),
       new ArcLayer({
@@ -229,7 +230,7 @@ export default function MercatorMap({
         widthMinPixels: 1,
       }),
     ],
-    [customData, arcsData, getArcColor]
+    [customData, arcsData, getArcColor, dynamicSize]
   );
 
   const handleClick = useCallback(
